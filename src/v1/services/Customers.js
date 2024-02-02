@@ -14,9 +14,38 @@ const insert = (data) => {
   );
 };
 
+const insertContact = (data) => {
+  return process.pool.query(
+    `INSERT INTO "dailycontacts" (userid, customerid, companyname, person, contacttype, date, time, result)
+     VALUES( $1, $2, $3, $4, $5, $6, $7, $8)
+     RETURNING *`,
+    [
+      data.userid,
+      data.customerid,
+      data.companyname,
+      data.person,
+      data.contacttype,
+      data.date,
+      data.time,
+      data.result,
+    ]
+  );
+};
+
+
+
 const getAll = () => {
   return process.pool.query('SELECT * FROM "customer" ORDER BY customerid ASC');
 };
+
+const getDateRangeContacts = (data) => {
+   console.log("data", data)
+  return process.pool.query(
+    'SELECT * FROM "dailycontacts" WHERE date BETWEEN $1 AND $2 ORDER BY date ASC',
+    [data.startDate, data.endDate]
+  );
+};
+
 
 const getOne = (customerid) => {
   return process.pool.query('SELECT * FROM "customer" WHERE customerid = $1', [
@@ -40,16 +69,43 @@ const update = (data) => {
   );
 }; 
 
+const updateContact = (data) => {
+  return process.pool.query(
+    `UPDATE "dailycontacts" 
+     SET customerid=$2, person = $3, contacttype = $4, date = $5,time = $6,result = $7, companyname=$8 WHERE id = $1 RETURNING *`,
+    [
+      data.id,
+      data.customerid,
+      data.person,
+      data.contacttype,
+      data.date,
+      data.time,
+      data.result,
+      data.companyname
+    ]
+  );
+};
+
+
 const del = (id) => {
   return process.pool.query('DELETE FROM "customer" WHERE customerid = $1', [
     id,
   ]);
 };
 
+const delContact = (id) => {
+  return process.pool.query('DELETE FROM "dailycontacts" WHERE id = $1', [
+    id,
+  ]);
+};
 module.exports = {
   insert,
   getAll,
   getOne,
   update,
   del,
+  insertContact,
+  getDateRangeContacts,
+  updateContact,
+  delContact
 };
