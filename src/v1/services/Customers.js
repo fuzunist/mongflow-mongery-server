@@ -72,7 +72,7 @@ const update = (data) => {
 const updateContact = (data) => {
   return process.pool.query(
     `UPDATE "dailycontacts" 
-     SET customerid=$2, person = $3, contacttype = $4, date = $5,time = $6,result = $7, companyname=$8 WHERE id = $1 RETURNING *`,
+     SET customerid=$2, person = $3, contacttype = $4, date = $5, time = $6, result = $7, companyname=$8 WHERE id = $1 RETURNING *`,
     [
       data.id,
       data.customerid,
