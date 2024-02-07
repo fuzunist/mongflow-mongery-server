@@ -1,6 +1,6 @@
 const insert = (data) => {
   return process.pool.query(
-    'INSERT INTO "customer" (userid, companyname, email, phone, address, website, products, contacts ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING *',
+    'INSERT INTO "customer" (userid, companyname, email, phone, address, website, products, contacts, taxid, taxoffice ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING *',
     [
       data.userid,
       data.companyname,
@@ -9,7 +9,9 @@ const insert = (data) => {
       data.address,
       data.website,
       data.products,
-      data.contacts
+      data.contacts,
+      data.taxid,
+      data.taxoffice
     ]
   );
 };
@@ -55,7 +57,7 @@ const getOne = (customerid) => {
 
 const update = (data) => {
   return process.pool.query(
-    'UPDATE "customer" SET companyname = $1, email = $2, phone = $3, address = $4, website=$5, contacts=$6, products=$7 WHERE customerid = $8 RETURNING *',
+    'UPDATE "customer" SET companyname = $1, email = $2, phone = $3, address = $4, website=$5, contacts=$6, products=$7, taxid=$8, taxoffice=$9 WHERE customerid = $10 RETURNING *',
     [
       data.companyname,
       data.email,
@@ -64,7 +66,10 @@ const update = (data) => {
       data.website,
       data.contacts,
       data.products,
-      data.customerid,
+      data.taxid,
+      data.taxoffice,
+      data.customerid
+     
     ]
   );
 }; 
