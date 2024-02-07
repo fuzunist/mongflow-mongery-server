@@ -30,12 +30,12 @@ const getAttribute = (client, name, productId) => {
     return client.query('SELECT attribute_id FROM attribute WHERE attribute_name = $1 AND product_id = $2', [name, productId])
 }
 
-const insertAttribute = (client, name, productId) => {
-    return client.query('INSERT INTO attribute(attribute_name, product_id) VALUES($1, $2) RETURNING attribute_id', [name, productId])
+const insertAttribute = (client, name, productId, packaging) => {
+    return client.query('INSERT INTO attribute(attribute_name, product_id, packaging) VALUES($1, $2, $3) RETURNING attribute_id', [name, productId, packaging])
 }
 
-const updateAttribute = (client, attribute_name, attribute_id) => {
-    return client.query('UPDATE "attribute" SET attribute_name = $1 WHERE attribute_id = $2 RETURNING *', [attribute_name, attribute_id])
+const updateAttribute = (client, attribute_name, attribute_id, packaging) => {
+    return client.query('UPDATE "attribute" SET attribute_name = $1, packaging=$3 WHERE attribute_id = $2 RETURNING *', [attribute_name, attribute_id, packaging])
 }
 
 const delAttribute = (client, product_id, attribute_id) => {
@@ -51,8 +51,8 @@ const insertValue = (client, name, productId, attributeId) => {
     return client.query('INSERT INTO value(product_id, attribute_id, value) VALUES($1, $2, $3) RETURNING value_id', [productId, attributeId, name])
 }
 
-const updateValue = (client, value, attribute_id) => {
-    return client.query('UPDATE "value" SET value = $1 WHERE attribute_id = $2 RETURNING *', [value, attribute_id])
+const updateValue = (client, value, attribute_id, value_id) => {
+    return client.query('UPDATE "value" SET value = $1 WHERE value_id = $2 RETURNING *', [value, value_id])
 }
 
 const delValue = (client, product_id, value_id) => {
@@ -96,6 +96,7 @@ const getAll = () => {
                     v.product_id,
                     a.attribute_id,
                     a.attribute_name,
+                    a.packaging,
                     jsonb_agg(jsonb_build_object(
                         'value_id', v.value_id,
                         'value', v.value,
@@ -108,7 +109,7 @@ const getAll = () => {
                 LEFT JOIN
                     attributevalueextraprice AS avel ON v.value_id = avel.value_id
                 GROUP BY
-                    v.product_id, a.attribute_id, a.attribute_name
+                    v.product_id, a.attribute_id, a.attribute_name, a.packaging
             )
             SELECT
                 p.product_id,
@@ -120,6 +121,7 @@ const getAll = () => {
                 jsonb_agg(jsonb_build_object(
                     'attribute_id', av.attribute_id,
                     'attribute_name', av.attribute_name,
+                    'packaging', av.packaging,
                     'values', av.values
                 ) ORDER BY av.attribute_id ASC) AS attributes
             FROM

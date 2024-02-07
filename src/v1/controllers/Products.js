@@ -74,6 +74,7 @@ const create = async (req, res) => {
         attribute_id: null,
         attribute_name: attr.attribute_name,
         values: [],
+        packaging: attr.packaging
       };
 
       const { rows: getAttributeRows, rowCount: getAttributeRowCount } =
@@ -86,7 +87,9 @@ const create = async (req, res) => {
         const { rows: insertAttributeRows } = await insertAttribute(
           client,
           attribute.attribute_name,
-          product.product_id
+          product.product_id,
+          attribute.packaging
+
         );
         attribute.attribute_id = insertAttributeRows[0].attribute_id;
       } else attribute.attribute_id = getAttributeRows[0].attribute_id;
@@ -275,75 +278,104 @@ const put = async (req, res) => {
       }
     }
 
-    for (const attr of data.attributes) {
-      const attribute = {
-        attribute_id: attr?.attribute_id,
-        attribute_name: attr.attribute_name,
-        values: [],
-      };
-
-      if (attribute.attribute_id) {
-        await updateAttribute(client, attr.attribute_name, attr.attribute_id);
-      } else {
-        const { rows: getAttributeRows, rowCount: getAttributeRowCount } =
-          await getAttribute(
-            client,
-            attribute.attribute_name,
-            product.product_id
-          );
-        if (!getAttributeRowCount) {
-          const { rows: insertAttributeRows } = await insertAttribute(
-            client,
-            attribute.attribute_name,
-            product.product_id
-          );
-          attribute.attribute_id = insertAttributeRows[0].attribute_id;
-        } else attribute.attribute_id = getAttributeRows[0].attribute_id;
-      }
-
-      for (const val of attr.values) {
-        const value = {
-          value_id: val?.value_id,
-          value: val.value,
-          extra_price: val?.extra_price || "0",
+    for (let attr of data.attributes) {
+      // Use let instead of const to create a new binding for each iteration
+      await client.query("BEGIN");
+      try {
+        const attribute = {
+          attribute_id: attr?.attribute_id,
+          attribute_name: attr.attribute_name,
+          values: [],
+          packaging: attr.packaging
         };
 
-        if (value.value_id) {
-          await updateValue(client, value.value, attr.attribute_id);
-          await updateExtraPrice(
-            client,
-            value.extra_price,
-            currencyId,
-            value.value_id
-          );
+        if (attribute.attribute_id) {
+          console.log("yay attr id exist");
+          console.log("attr info", attr.attribute_name, attr.attribute_id);
+          await updateAttribute(client, attr.attribute_name, attr.attribute_id, attr.packaging);
         } else {
-          const { rows: insertValueRows } = await insertValue(
-            client,
-            value.value,
-            product.product_id,
-            attribute.attribute_id
-          );
-          value.value_id = insertValueRows[0].value_id;
-          await insertExtraPrice(
-            client,
-            value.value_id,
-            currencyId,
-            value.extra_price
-          );
+          console.log("nope else block");
+          const { rows: getAttributeRows, rowCount: getAttributeRowCount } =
+            await getAttribute(
+              client,
+              attribute.attribute_name,
+              product.product_id
+            );
+          if (!getAttributeRowCount) {
+            const { rows: insertAttributeRows } = await insertAttribute(
+              client,
+              attribute.attribute_name,
+              product.product_id,
+              attr.packaging
+            );
+            attribute.attribute_id = insertAttributeRows[0].attribute_id;
+          } else attribute.attribute_id = getAttributeRows[0].attribute_id;
         }
 
-        attribute.values.push(value);
-      }
+        for (let val of attr.values) {
+          await client.query("BEGIN");
+          try {
+            const value = {
+              value_id: val?.value_id,
+              value: val.value,
+              extra_price: val?.extra_price || "0",
+            };
 
-      product.attributes.push(attribute);
+            if (value.value_id) {
+              console.log("yay value id exist");
+              console.log("value info: ", value.value, attr.attribute_id);
+              await updateValue(
+                client,
+                value.value,
+                attr.attribute_id,
+                value.value_id
+              );
+              await updateExtraPrice(
+                client,
+                value.extra_price,
+                currencyId,
+                value.value_id
+              );
+            } else {
+              const { rows: insertValueRows } = await insertValue(
+                client,
+                value.value,
+                product.product_id,
+                attribute.attribute_id
+              );
+              value.value_id = insertValueRows[0].value_id;
+              await insertExtraPrice(
+                client,
+                value.value_id,
+                currencyId,
+                value.extra_price
+              );
+            }
+
+            attribute.values.push(value);
+            await client.query("COMMIT");
+          } catch (error) {
+            await client.query("ROLLBACK");
+            console.error("Transaction rolled back:", error);
+            throw new Error("Error processing details");
+          }
+        }
+
+        product.attributes.push(attribute);
+      } catch (error) {
+        await client.query("ROLLBACK");
+        console.error("Transaction rolled back:", error);
+        throw new Error("Error processing details");
+      }
     }
 
     await client.query("COMMIT");
     client.release();
     res.status(httpStatus.CREATED).send(product);
   } catch (e) {
-     console.log(e)
-    client.release();
+    await client.query("ROLLBACK");
+    console.error("Transaction rolled back:", e);
+
     res
       .status(httpStatus.INTERNAL_SERVER_ERROR)
       .send({ error: "An error occurred." });
