@@ -38,7 +38,7 @@ const insertContact = (data) => {
 
 
 const getAll = () => {
-  return process.pool.query('SELECT * FROM "customer" ORDER BY customerid ASC');
+  return process.pool.query('SELECT * FROM "customer" ORDER BY companyname ASC');
 };
 
 const getDateRangeContacts = (data) => {
