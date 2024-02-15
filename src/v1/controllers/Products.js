@@ -62,6 +62,8 @@ const create = async (req, res) => {
     );
     product.product_id = insertRows[0].product_id;
 
+
+
     await insertCurrencyId(
       client,
       product.product_id,

@@ -1,12 +1,12 @@
 const authenticate = require("../middlewares/authenticate");
 
-const { get, put, updateStocks, create, getLogs, createLog, putLog, updateStocksInProduction } = require("../controllers/RecipeMaterials");
+const { get, put, updateStocks, create, getLogs, createLog, putLog, updateStocksInProduction } = require("../controllers/RecipeMaterialStocks");
 
 const express = require("express");
 const router = express.Router();
 
 router.route("/").get(authenticate, get);
-router.route("/").post(authenticate, create);
+router.route("/").post(authenticate, createLog);
 router.route("/:id").put(authenticate, put);
 router.route("/stocks/:id").put( updateStocks);
 router.route("/stocks/production/:id").put( updateStocksInProduction);

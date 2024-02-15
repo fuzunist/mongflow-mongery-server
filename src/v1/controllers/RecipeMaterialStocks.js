@@ -1,3 +1,4 @@
+const { insertCurrency, currency, getName } = require("../services/Products");
 const {
   getAll,
   updateEach,
@@ -5,10 +6,13 @@ const {
   getAllLogs,
   updateEachLog,
   insertLog,
+  getStock,
+  insertStock,
+  updateStock,
   checkExistingMaterial,
   updateEachStock,
   updateEachStockInProduction
-} = require("../services/RecipeMaterials");
+} = require("../services/RecipeMaterialStocks");
 const httpStatus = require("http-status/lib");
 
 const create = async (req, res) => {
@@ -98,23 +102,76 @@ const put = async (req, res) => {
   }
 };
 
-const createLog = async (req, res) => {
-  // const { item_id, date, price, quantity, last_edited_by, supplier, waybill } =
-  //   req.body;
 
-  try {
-    insertLog(req.body)
-      .then(({ rows }) => res.status(httpStatus.CREATED).send(rows[0]))
-      .catch((e) => {
-        console.log(e);
-        return res.status(httpStatus.INTERNAL_SERVER_ERROR).send({ error: e });
+const createLog = async (req, res) => {
+  const client = await process.pool.connect();
+  const data = req.body;
+
+  await client.query("BEGIN");
+  const { rows: currencyRows, rowCount: currencyRowCount } = await currency(
+    client,
+    data.currency
+  );
+  let currency_id;
+
+  if (!currencyRowCount) {
+    const { rows: insertCurrencyRows } = await insertCurrency(
+      client,
+      data.currency
+    );
+    currency_id = insertCurrencyRows[0].currency_id;
+  } else currency_id = currencyRows[0].currency_id;
+
+  data["currency_id"]= currency_id;
+
+  insertLog(data, client)
+    .then(async ({ rows: stockLogs }) => {
+      const { rows: stock, rowCount: stockRowCount } = await getStock(
+        { product_id: data.product_id, attributes: data.attributes },
+        client
+      );
+      let stockResult;
+      if (stockRowCount) {
+        // burada update stock
+        const { rows: stocks } = await updateStock(data, client);
+        stockResult = stocks;
+      } else {
+        // burada insert stock
+        const { rows: stocks } = await insertStock(data, client);
+        stockResult = stocks;
+      }
+      const { rows: productRows } = await getName(data.product_id);
+      global.socketio.emit("notification", {
+        type: "stock",
+        stock: {
+          ...stockLogs[0],
+          product_name: productRows[0].product_name,
+          constituent_username: req.user.username,
+          last_edited_by_username: req.user.username,
+        },
+        userid: req.user.userid,
       });
-  } catch (e) {
-    console.log(e);
-    res
-      .status(httpStatus.INTERNAL_SERVER_ERROR)
-      .send({ error: "An error occurred." });
-  }
+      res
+        .status(httpStatus.CREATED)
+        .send({ logs: stockLogs, stocks: stockResult });
+      await client.query("COMMIT");
+    })
+    .catch(async (e) => {
+      await client.query("ROLLBACK");
+
+      if (e.constraint === "unique_stock_date")
+        return res
+          .status(httpStatus.BAD_REQUEST)
+          .send({
+            error:
+              "A registration has already been created for the selected product today.",
+          });
+
+      console.log(e);
+      res
+        .status(httpStatus.INTERNAL_SERVER_ERROR)
+        .send({ error: "An error occurred." });
+    });
 };
 
 const getLogs = (req, res) => {

@@ -148,20 +148,32 @@ const updateEach = async (id, data) => {
   return process.pool.query(query, values);
 };
 
-const insertLog = (data) => {
-  return process.pool.query(
-    "INSERT INTO recipemateriallogs(item_id, date, price, quantity, last_edited_by, waybill, supplier) VALUES($1, $2, $3, $4, $5, $6, $7) RETURNING *",
-    [
-      data.item_id,
-      data.date,
-      parseFloat(data.price),
-      data.quantity,
-      data.last_edited_by,
-      data.waybill,
-      data.supplier,
-    ]
-  );
-};
+
+const insertLog = (data, client) => {
+  const query = `
+      INSERT INTO recipemateriallogs (
+          date, userid, product_id, attributes, price, 
+          quantity, waybill, payment_type, payment_date, 
+          customer_id, customer_city, customer_county, 
+          currency_id, exchange_rate, details
+      ) 
+      VALUES (
+          $1, $2, $3, $4, $5,
+          $6, $7, $8, $9, $10, 
+          $11, $12, $13, $14, $15
+      ) 
+      RETURNING *`;
+
+  const values = [
+      data.date, data.userid, data.product_id, data.attributes, data.price, 
+      data.quantity, data.waybill, data.payment_type, data.payment_date, 
+      data.customer_id, data.customer_city, data.customer_county, 
+      data.currency_id, data.exchange_rate, data.details
+  ];
+
+  if (client) return client.query(query, values);
+  return process.pool.query(query, values);
+}
 
 const getAllLogs = () => {
   return process.pool.query(
@@ -184,11 +196,48 @@ const updateEachLog = async (id, data) => {
   return process.pool.query(query, values);
 };
 
+const getStock= (data, client)=>{
+  const query = 'SELECT id FROM recipematerialstocks WHERE product_id = $1 and attributes=$2'
+  const values = [data.product_id, data.attributes]
+
+  if (client) return client.query(query, values)
+  return process.pool.query(query, values)
+}
+
+const insertStock = (data, client)=>{
+  const query = 'INSERT INTO recipematerialstocks (product_id, attributes, price, quantity ) VALUES( $1, $2, $3, $4) RETURNING *'
+  const values = [data.product_id, data.attributes, data.price, data.quantity]
+
+  if (client) return client.query(query, values)
+  return process.pool.query(query, values)
+}
+
+const updateStock = (data, client) => {
+  const query = `
+  UPDATE recipematerialstocks 
+  SET 
+      price = ROUND(((price * quantity + $4::numeric * $3::numeric) / (quantity + $4::numeric))::numeric, 4),
+      quantity = quantity + $4 
+  WHERE 
+      product_id = $1 AND 
+      attributes = $2 
+  RETURNING *`;
+
+  const values = [data.product_id, data.attributes, data.price, data.quantity];
+
+  if (client) return client.query(query, values);
+  return process.pool.query(query, values);
+};
+
+
 module.exports = {
   getAll,
   updateEach,
   insert,
   insertLog,
+  getStock,
+  insertStock,
+  updateStock,
   updateEachLog,
   getAllLogs,
   checkExistingMaterial,
