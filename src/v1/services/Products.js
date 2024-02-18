@@ -2,6 +2,11 @@ const currency = (client, defaultCurrency) => {
     return client.query('SELECT currency_id FROM Currency WHERE currency_code = $1', [defaultCurrency])
 }
 
+const getCurrency= ( currency_id, client)=>{
+    return client.query('SELECT currency_code FROM currency WHERE currency_id = $1', [currency_id])
+
+}
+
 const insertCurrency = (client, defaultCurrency) => {
     return client.query('INSERT INTO Currency(currency_code) VALUES($1) RETURNING currency_id', [defaultCurrency])
 }
@@ -208,6 +213,7 @@ module.exports = {
     currency,
     insertCurrency,
     insertCurrencyId,
+    getCurrency,
     getAttribute,
     insertAttribute,
     getValue,

@@ -12,7 +12,7 @@ const insert = (data) => {
       data.contacts,
       data.taxid,
       data.taxoffice,
-      data.customer_type
+      data.customer_type,
     ]
   );
 };
@@ -35,26 +35,36 @@ const insertContact = (data) => {
   );
 };
 
-
-
 const getAll = () => {
-  return process.pool.query('SELECT * FROM "customer" ORDER BY companyname ASC');
+  return process.pool.query(
+    'SELECT * FROM "customer" ORDER BY companyname ASC'
+  );
 };
 
 const getDateRangeContacts = (data) => {
-   console.log("data", data)
+  console.log("data", data);
   return process.pool.query(
-    'SELECT * FROM "dailycontacts" WHERE date BETWEEN $1 AND $2 ORDER BY date ASC',
+    'SELECT * FROM "dailycontacts" WHERE date BETWEEN $1 AND $2 ORDER BY date DESC',
     [data.startDate, data.endDate]
   );
 };
 
+const getOne = (customerid, client) => {
+  const query =`SELECT * FROM "customer" WHERE customerid = $1`;
+  const values = [customerid];
 
-const getOne = (customerid) => {
-  return process.pool.query('SELECT * FROM "customer" WHERE customerid = $1', [
-    customerid,
-  ]);
+  if (client) return client.query(query, values);
+  return process.pool.query(query, values);
 };
+
+const getCustomerName = (customerid, client) => {
+  const query =`SELECT companyname FROM "customer" WHERE customerid = $1`;
+  const values = [customerid];
+
+  if (client) return client.query(query, values);
+  return process.pool.query(query, values);
+};
+
 
 const update = (data) => {
   return process.pool.query(
@@ -70,11 +80,10 @@ const update = (data) => {
       data.taxid,
       data.taxoffice,
       data.customer_type,
-      data.customerid
-     
+      data.customerid,
     ]
   );
-}; 
+};
 
 const updateContact = (data) => {
   return process.pool.query(
@@ -88,11 +97,10 @@ const updateContact = (data) => {
       data.date,
       data.time,
       data.result,
-      data.companyname
+      data.companyname,
     ]
   );
 };
-
 
 const del = (id) => {
   return process.pool.query('DELETE FROM "customer" WHERE customerid = $1', [
@@ -101,9 +109,7 @@ const del = (id) => {
 };
 
 const delContact = (id) => {
-  return process.pool.query('DELETE FROM "dailycontacts" WHERE id = $1', [
-    id,
-  ]);
+  return process.pool.query('DELETE FROM "dailycontacts" WHERE id = $1', [id]);
 };
 module.exports = {
   insert,
@@ -114,5 +120,6 @@ module.exports = {
   insertContact,
   getDateRangeContacts,
   updateContact,
-  delContact
+  delContact,
+  getCustomerName
 };

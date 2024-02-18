@@ -1,5 +1,5 @@
-
-const { insertCurrency, getName, currency } = require("../services/Products");
+const { getCustomerName } = require("../services/Customers");
+const { insertCurrency, getName, currency, getCurrency } = require("../services/Products");
 const {
   getAll,
   updateEach,
@@ -9,9 +9,12 @@ const {
   insertLog,
   getStock,
   updateStock,
-  insertStock
+  insertStock,
+  getRangeLogs,
+  getAllAttributeDetails
 } = require("../services/RawMaterialStocks");
 const httpStatus = require("http-status/lib");
+const { findOne } = require("../services/Users");
 
 const create = async (req, res) => {
   const { material, cost, preprocesscost, stock } = req.body;
@@ -62,7 +65,6 @@ const put = async (req, res) => {
   }
 };
 
-
 const createLog = async (req, res) => {
   const client = await process.pool.connect();
   const data = req.body;
@@ -82,7 +84,7 @@ const createLog = async (req, res) => {
     currency_id = insertCurrencyRows[0].currency_id;
   } else currency_id = currencyRows[0].currency_id;
 
-  data["currency_id"]= currency_id;
+  data["currency_id"] = currency_id;
 
   insertLog(data, client)
     .then(async ({ rows: stockLogs }) => {
@@ -111,21 +113,40 @@ const createLog = async (req, res) => {
         },
         userid: req.user.userid,
       });
-      res
-        .status(httpStatus.CREATED)
-        .send({ logs: stockLogs, stocks: stockResult });
+
+      const { rows: user } = await findOne(req.user.userid);
+      const username = user[0].username;
+      const customerResult = await getCustomerName(data.customer_id, client);
+      const companyname = customerResult.rows[0].companyname;
+      const product_name = productRows[0].product_name;
+
+      const { rows: currency } = await getCurrency(stockLogs[0].currency_id, client);
+      const currency_code = currency[0].currency_code;
+      const { rows: attr } = await getAllAttributeDetails(stockLogs[0].id, client);
+       console.log("attr",attr)
+      const attributedetails = attr[0].attributedetails;
+
+      res.status(httpStatus.CREATED).send({
+        logs: {
+          ...stockLogs[0],
+          companyname,
+          attributedetails,
+          product_name,
+          username,
+          currency_code,
+        },
+        stocks: stockResult,
+      });
       await client.query("COMMIT");
     })
     .catch(async (e) => {
       await client.query("ROLLBACK");
 
       if (e.constraint === "unique_stock_date")
-        return res
-          .status(httpStatus.BAD_REQUEST)
-          .send({
-            error:
-              "A registration has already been created for the selected product today.",
-          });
+        return res.status(httpStatus.BAD_REQUEST).send({
+          error:
+            "A registration has already been created for the selected product today.",
+        });
 
       console.log(e);
       res
@@ -143,6 +164,18 @@ const getLogs = (req, res) => {
       console.log(e);
       res.status(httpStatus.INTERNAL_SERVER_ERROR).send({ error: e });
     });
+};
+
+const getLogsByDate = (req, res) => {
+  getRangeLogs({ ...req.query })
+    .then(({ rows }) => res.status(httpStatus.OK).send(rows))
+    .catch((err) =>
+     {
+ console.log(err)
+      return res
+        .status(httpStatus.INTERNAL_SERVER_ERROR)
+        .send({ error: "An error occurred." })}
+    );
 };
 
 const putLog = async (req, res) => {
@@ -169,4 +202,12 @@ const putLog = async (req, res) => {
     console.log(err);
   }
 };
-module.exports = { get, put, create, getLogs, putLog, createLog };
+module.exports = {
+  get,
+  put,
+  create,
+  getLogs,
+  getLogsByDate,
+  putLog,
+  createLog,
+};

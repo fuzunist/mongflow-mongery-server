@@ -148,7 +148,6 @@ const updateEach = async (id, data) => {
   return process.pool.query(query, values);
 };
 
-
 const insertLog = (data, client) => {
   const query = `
       INSERT INTO recipemateriallogs (
@@ -165,19 +164,82 @@ const insertLog = (data, client) => {
       RETURNING *`;
 
   const values = [
-      data.date, data.userid, data.product_id, data.attributes, data.price, 
-      data.quantity, data.waybill, data.payment_type, data.payment_date, 
-      data.customer_id, data.customer_city, data.customer_county, 
-      data.currency_id, data.exchange_rate, data.details
+    data.date,
+    data.userid,
+    data.product_id,
+    data.attributes,
+    data.price,
+    data.quantity,
+    data.waybill,
+    data.payment_type,
+    data.payment_date,
+    data.customer_id,
+    data.customer_city,
+    data.customer_county,
+    data.currency_id,
+    data.exchange_rate,
+    data.details,
   ];
 
   if (client) return client.query(query, values);
   return process.pool.query(query, values);
-}
+};
 
 const getAllLogs = () => {
   return process.pool.query(
     "SELECT * FROM recipemateriallogs ORDER BY date ASC"
+  );
+};
+
+const getAllAttributeDetails = (id, client) => {
+  const query = `SELECT recipemateriallogs.product_id, 
+                jsonb_object_agg(attr.attribute_name, val.value) as attributeDetails
+         FROM recipemateriallogs
+         LEFT JOIN LATERAL (
+             SELECT key::int AS attr_id, value::int AS val_id
+             FROM jsonb_each_text(recipemateriallogs.attributes::jsonb)
+         ) AS attr_val ON true
+         LEFT JOIN attribute AS attr ON attr.attribute_id = attr_val.attr_id
+         LEFT JOIN value AS val ON val.value_id = attr_val.val_id
+         WHERE recipemateriallogs.id= $1
+         GROUP BY recipemateriallogs.product_id`;
+
+  const values = [id];
+  if (client) return client.query(query, values);
+  return process.pool.query(query, values);
+};
+
+const getRangeLogs = (data) => {
+
+  return process.pool.query(
+    `SELECT recipemateriallogs.*, customer.companyname, product.product_name, currency.currency_code, "User".username, attr_details.attributeDetails
+       FROM recipemateriallogs
+       INNER JOIN customer ON recipemateriallogs.customer_id = customer.customerid
+       INNER JOIN product ON recipemateriallogs.product_id = product.product_id
+       INNER JOIN currency ON recipemateriallogs.currency_id = currency.currency_id
+       INNER JOIN "User" ON recipemateriallogs.userid = "User".userid
+       LEFT JOIN (
+           SELECT recipemateriallogs.product_id, 
+                  jsonb_object_agg(attr.attribute_name, val.value) as attributeDetails
+           FROM recipemateriallogs
+           CROSS JOIN LATERAL (
+              SELECT key::int AS attr_id, value::int AS val_id
+              FROM jsonb_each_text(recipemateriallogs.attributes::jsonb)
+           ) AS attr_val
+           LEFT JOIN attribute AS attr ON attr.attribute_id = attr_val.attr_id
+           LEFT JOIN value AS val ON val.value_id = attr_val.val_id
+           WHERE recipemateriallogs.date BETWEEN $1 AND $2
+           GROUP BY recipemateriallogs.product_id
+       ) AS attr_details ON recipemateriallogs.product_id = attr_details.product_id
+       WHERE recipemateriallogs.date BETWEEN $1 AND $2
+       ORDER BY recipemateriallogs.date ASC`,
+    [data.startDate, data.endDate]
+  );
+};
+
+const getAllWarehouse = () => {
+  return process.pool.query(
+    `SELECT * FROM lastproductwarehouse ORDER BY id ASC`
   );
 };
 
@@ -196,21 +258,23 @@ const updateEachLog = async (id, data) => {
   return process.pool.query(query, values);
 };
 
-const getStock= (data, client)=>{
-  const query = 'SELECT id FROM recipematerialstocks WHERE product_id = $1 and attributes=$2'
-  const values = [data.product_id, data.attributes]
+const getStock = (data, client) => {
+  const query =
+    "SELECT id FROM recipematerialstocks WHERE product_id = $1 and attributes=$2";
+  const values = [data.product_id, data.attributes];
 
-  if (client) return client.query(query, values)
-  return process.pool.query(query, values)
-}
+  if (client) return client.query(query, values);
+  return process.pool.query(query, values);
+};
 
-const insertStock = (data, client)=>{
-  const query = 'INSERT INTO recipematerialstocks (product_id, attributes, price, quantity ) VALUES( $1, $2, $3, $4) RETURNING *'
-  const values = [data.product_id, data.attributes, data.price, data.quantity]
+const insertStock = (data, client) => {
+  const query =
+    "INSERT INTO recipematerialstocks (product_id, attributes, price, quantity ) VALUES( $1, $2, $3, $4) RETURNING *";
+  const values = [data.product_id, data.attributes, data.price, data.quantity];
 
-  if (client) return client.query(query, values)
-  return process.pool.query(query, values)
-}
+  if (client) return client.query(query, values);
+  return process.pool.query(query, values);
+};
 
 const updateStock = (data, client) => {
   const query = `
@@ -229,7 +293,6 @@ const updateStock = (data, client) => {
   return process.pool.query(query, values);
 };
 
-
 module.exports = {
   getAll,
   updateEach,
@@ -240,7 +303,9 @@ module.exports = {
   updateStock,
   updateEachLog,
   getAllLogs,
+  getRangeLogs,
   checkExistingMaterial,
   updateEachStock,
-  updateEachStockInProduction
+  updateEachStockInProduction,
+  getAllAttributeDetails
 };

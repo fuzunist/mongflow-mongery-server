@@ -1,6 +1,6 @@
 const authenticate = require("../middlewares/authenticate");
 
-const { get, put, updateStocks, create, getLogs, createLog, putLog, updateStocksInProduction } = require("../controllers/RecipeMaterialStocks");
+const { get, put, updateStocks, create, getLogs, createLog, putLog, updateStocksInProduction, getLogsByDate } = require("../controllers/RecipeMaterialStocks");
 
 const express = require("express");
 const router = express.Router();
@@ -15,7 +15,7 @@ router.route("/stocks/production/:id").put( updateStocksInProduction);
 
 
 
-router.route("/logs").get(authenticate, getLogs);
+router.route("/logs").get(authenticate, getLogsByDate);
 router.route("/logs").post(authenticate, createLog);
 router.route("/logs/:id").patch(authenticate, putLog);
 module.exports = router;
