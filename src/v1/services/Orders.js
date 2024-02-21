@@ -1,6 +1,21 @@
 const insert = (client, data) => {
   return client.query(
-    `INSERT INTO orders (userid, customer_id, currency_id, order_status, order_date, order_number, subtotal, tax_rate, total_with_tax, products, sets, status, approver_id, exchange_rate, total_cost) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15) RETURNING *`,
+    `INSERT INTO orders (
+        userid, customer_id, currency_id, order_status, order_date, 
+        order_number, subtotal, tax_rate, total_with_tax, products, 
+        sets, status, approver_id, exchange_rate, total_cost, 
+        valid_date, delivery_terms, delivery_point, payment_type, 
+        maturity, notes, vat_declaration, vat_witholding_rate, 
+        vat_witholding
+    ) 
+    VALUES (
+        $1, $2, $3, $4, $5, 
+        $6, $7, $8, $9, $10, 
+        $11, $12, $13, $14, $15, 
+        $16, $17, $18, $19, $20, 
+        $21, $22, $23, $24
+    ) 
+    RETURNING *`,
     [
       data.userid,
       data.customer_id,
@@ -17,6 +32,15 @@ const insert = (client, data) => {
       data.approver_id,
       data.exchange_rate,
       data.total_cost,
+      data.valid_date,
+      data.delivery_terms,
+      data.delivery_point,
+      data.payment_type,
+      data.maturity,
+      data.notes,
+      data.vat_declaration,
+      data.vat_witholding_rate,
+      data.vat_witholding,
     ]
   );
 };
@@ -36,7 +60,7 @@ const getAll = () => {
                 GROUP BY customerid
             ) 
             SELECT o.*, u.username, c.currency_code, cu.Customer[0], u2.username AS approver 
-            FROM "orders" o 
+            FROM "orders" o
             LEFT JOIN "User" u ON o.userid = u.userid 
             LEFT JOIN "User" u2 ON o.approver_id = u2.userid 
             LEFT JOIN "currency" c ON o.currency_id = c.currency_id 

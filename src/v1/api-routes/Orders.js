@@ -22,7 +22,7 @@ const router = express.Router();
 router.route("/").get(authenticate, get);
 router
   .route("/")
-  .post(authenticate, validate(schemas.createValidation), create);
+  .post(authenticate, create);
 router
   .route("/:id")
   .put(
