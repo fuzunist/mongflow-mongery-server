@@ -81,17 +81,32 @@ const updateWarehouseStock = (data, client) => {
 
 const getWarehouseStock = (data, client) => {
   const query = `
-        SELECT id 
-        FROM lastproductwarehouse 
-        WHERE product_id = $1 
-        AND attributes = $2 
-        AND price = $3 
-        AND customer_id = $4 
-        AND customer_city = $5
-        AND customer_county = $6 
-        AND currency_id = $7 
-        AND exchange_rate = $8
-    `;
+    SELECT 
+      w.id,
+      w.product_id,
+      w.price,
+      w.quantity,
+      jsonb_object_agg(attr.attribute_name, val.value) as attributeDetails
+    FROM 
+      lastproductwarehouse w
+    LEFT JOIN LATERAL (
+      SELECT key::int AS attr_id, value::int AS val_id
+      FROM jsonb_each_text(w.attributes::jsonb)
+    ) AS attr_val ON true
+    LEFT JOIN attribute AS attr ON attr.attribute_id = attr_val.attr_id
+    LEFT JOIN value AS val ON val.value_id = attr_val.val_id
+    WHERE 
+      w.product_id = $1 
+      AND w.attributes = $2 
+      AND w.price = $3 
+      AND w.customer_id = $4 
+      AND w.customer_city = $5
+      AND w.customer_county = $6 
+      AND w.currency_id = $7 
+      AND w.exchange_rate = $8
+    GROUP BY 
+      w.id, w.product_id, w.price, w.quantity
+  `;
   const values = [
     data.product_id,
     data.attributes,
@@ -102,19 +117,38 @@ const getWarehouseStock = (data, client) => {
     data.currency_id,
     data.exchange_rate,
   ];
-
-  if (client) {
-    return client.query(query, values);
-  } else {
-    return process.pool.query(query, values);
-  }
+  if (client) return client.query(query, values);
+  return process.pool.query(query, values);
 };
 
-const getProductStocks = ()=>{
+
+// const getProductStocks = ()=>{
+//   return process.pool.query(
+//     `SELECT * FROM lastproductstocks ORDER BY id ASC`
+//   );
+// }
+
+const getProductStocks = () => {
   return process.pool.query(
-    `SELECT * FROM lastproductstocks ORDER BY id ASC`
+    `SELECT 
+    s.id, s.product_id, s.price, s.quantity, p.product_name,
+      jsonb_object_agg(attr.attribute_name, val.value) as attributeDetails
+    FROM 
+      lastproductstocks s
+    LEFT JOIN LATERAL (
+      SELECT key::int AS attr_id, value::int AS val_id
+      FROM jsonb_each_text(s.attributes::jsonb)
+    ) AS attr_val ON true
+    LEFT JOIN attribute AS attr ON attr.attribute_id = attr_val.attr_id
+    LEFT JOIN value AS val ON val.value_id = attr_val.val_id
+    LEFT JOIN product AS p ON p.product_id = s.product_id
+    GROUP BY 
+      s.id, s.product_id, s.price, s.quantity, p.product_name
+    ORDER BY 
+      s.id ASC`
   );
-}
+};
+
 
 const getLast = (attributes, client) => {
   const query = `
@@ -181,6 +215,39 @@ const getAllAttributeDetails = (id, client) => {
   return process.pool.query(query, values);
 };
 
+
+const getAttributeDetails = (attributesJson, client) => {
+  const query = `
+    SELECT 
+      attr.attribute_name,
+      val.value
+    FROM (
+      SELECT key::int AS attr_id, value::int AS val_id
+      FROM jsonb_each_text($1::jsonb)
+    ) AS attr_val
+    LEFT JOIN attribute AS attr ON attr.attribute_id = attr_val.attr_id
+    LEFT JOIN value AS val ON val.value_id = attr_val.val_id
+  `;
+
+  const values = [attributesJson];
+
+  return new Promise((resolve, reject) => {
+    (client || process.pool).query(query, values, (err, result) => {
+      if (err) {
+        reject(err);
+      } else {
+        const attributeDetails = {};
+        result.rows.forEach(row => {
+          attributeDetails[row.attribute_name] = row.value;
+        });
+        resolve(attributeDetails);
+      }
+    });
+  });
+};
+
+
+
 const getRangeLogs = async (data) => {
   return await process.pool.query(
     `SELECT lastproductlogs.*, customer.companyname, product.product_name, currency.currency_code, "User".username, attr_details.attributeDetails
@@ -210,9 +277,50 @@ const getRangeLogs = async (data) => {
 
 const getAllWarehouse = () => {
   return process.pool.query(
-    `SELECT * FROM lastproductwarehouse ORDER BY id ASC`
+    `SELECT 
+      w.id, 
+      w.product_id, 
+      w.price, 
+      w.quantity,
+      w.attributes,
+      w.customer_id,
+      w.customer_city,
+      w.customer_county,
+      w.exchange_rate,
+      c.currency_code,
+      p.product_name,
+      s.companyname,
+      jsonb_object_agg(attr.attribute_name, val.value) as attributeDetails
+    FROM 
+      lastproductwarehouse w
+    LEFT JOIN LATERAL (
+      SELECT key::int AS attr_id, value::int AS val_id
+      FROM jsonb_each_text(w.attributes::jsonb)
+    ) AS attr_val ON true
+    LEFT JOIN attribute AS attr ON attr.attribute_id = attr_val.attr_id
+    LEFT JOIN value AS val ON val.value_id = attr_val.val_id
+    LEFT JOIN currency AS c ON c.currency_id = w.currency_id
+    LEFT JOIN product AS p ON p.product_id = w.product_id
+    LEFT JOIN customer AS s ON s.customerid = w.customer_id
+    GROUP BY 
+      w.id, 
+      w.product_id, 
+      w.price, 
+      w.quantity,
+      w.attributes,
+      w.customer_id,
+      w.customer_city,
+      w.customer_county,
+      w.exchange_rate,
+      c.currency_code,
+      p.product_name,
+      s.companyname
+    ORDER BY 
+      w.id ASC`
   );
 };
+
+
 
 const update = (data, client) => {
   const query =
@@ -308,5 +416,6 @@ module.exports = {
   getLastSet,
   getAllWarehouse,
   getAllAttributeDetails,
+  getAttributeDetails,
   getProductStocks
 };

@@ -12,9 +12,6 @@ router.route("/stocks/:id").put( updateStocks);
 router.route("/stocks/production/:id").put( updateStocksInProduction);
 
 
-
-
-
 router.route("/logs").get(authenticate, getLogsByDate);
 router.route("/logs").post(authenticate, createLog);
 router.route("/logs/:id").patch(authenticate, putLog);

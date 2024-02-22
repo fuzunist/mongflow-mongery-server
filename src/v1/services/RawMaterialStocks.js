@@ -6,7 +6,24 @@ const insert = (data) => {
 };
 
 const getAll = () => {
-  return process.pool.query("SELECT * FROM rawmaterialstocks");
+  return process.pool.query(
+    `SELECT 
+    s.id, s.product_id, s.price, s.quantity, p.product_name,
+      jsonb_object_agg(attr.attribute_name, val.value) as attributeDetails
+    FROM 
+    rawmaterialstocks s
+    LEFT JOIN LATERAL (
+      SELECT key::int AS attr_id, value::int AS val_id
+      FROM jsonb_each_text(s.attributes::jsonb)
+    ) AS attr_val ON true
+    LEFT JOIN attribute AS attr ON attr.attribute_id = attr_val.attr_id
+    LEFT JOIN value AS val ON val.value_id = attr_val.val_id
+    LEFT JOIN product AS p ON p.product_id = s.product_id
+    GROUP BY 
+      s.id, s.product_id, s.price, s.quantity, p.product_name
+    ORDER BY 
+      s.id ASC`
+  );
 };
 
 const updateEach = async (id, data) => {

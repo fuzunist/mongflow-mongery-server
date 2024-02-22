@@ -12,7 +12,8 @@ const {
   getWarehouseStock,
   getAllWarehouse,
   getAllAttributeDetails,
-  getProductStocks
+  getProductStocks,
+  getAttributeDetails,
 } = require("../services/LastProductStocks");
 const {
   getName,
@@ -44,30 +45,42 @@ const create = async (req, res) => {
 
   data["currency_id"] = currency_id;
 
+  const { rows: attr } = await getAllAttributeDetails(
+    stockLogs[0].id,
+    client
+  );
+
+
   insertLog(data, client)
     .then(async ({ rows: stockLogs }) => {
       const { rows: stock, rowCount: stockRowCount } = await getStock(
         { product_id: data.product_id, attributes: data.attributes },
         client
       );
+
+        const attributedetails = await getAttributeDetails(
+    data.attributes,
+    client
+  );
       let stockResult;
       if (stockRowCount) {
         // burada update stock
         const { rows: stocks } = await updateStock(data, client);
-        stockResult = stocks;
+        stockResult = { ...stocks[0], attributedetails: attributedetails };
       } else {
         // burada insert stock
         const { rows: stocks } = await insertStock(data, client);
         stockResult = stocks;
+        stockResult = { ...stocks[0], attributedetails: attributedetails };
+
       }
 
       const { rows: warehouseRows, rowCount: stockInWarehouseCount } =
         await getWarehouseStock(data, client);
 
-      let updatedRow;
-      let insertedRow;
+      let warehouseResult;
       if (stockInWarehouseCount) {
-        updatedRow = await updateWarehouseStock(
+        warehouseResult = await updateWarehouseStock(
           {
             id: warehouseRows[0].id,
             price: data.price,
@@ -76,7 +89,7 @@ const create = async (req, res) => {
           client
         );
       } else {
-        insertedRow = await insertWarehouseStock(data, client);
+        warehouseResult = await insertWarehouseStock(data, client);
       }
       const { rows: productRows } = await getName(data.product_id);
       global.socketio.emit("notification", {
@@ -96,11 +109,12 @@ const create = async (req, res) => {
       const companyname = customerResult.rows[0].companyname;
       const product_name = productRows[0].product_name;
 
-      const { rows: currency } = await getCurrency(stockLogs[0].currency_id, client);
+      const { rows: currency } = await getCurrency(
+        stockLogs[0].currency_id,
+        client
+      );
       const currency_code = currency[0].currency_code;
-      const { rows: attr } = await getAllAttributeDetails(stockLogs[0].id, client);
-       console.log("attr",attr)
-      const attributedetails = attr[0].attributedetails;
+   
       res.status(httpStatus.CREATED).send({
         logs: {
           ...stockLogs[0],
@@ -110,9 +124,8 @@ const create = async (req, res) => {
           username,
           currency_code,
         },
-        stocks: stockResult,
-        updatedWarehouseStock: updatedRow?.rows[0] ?? null,
-        insertedWarehouseStock: insertedRow?.rows[0] ?? null,
+        stocks: { ...stockResult, ...product_name },
+        warehouseStocks: {...warehouseResult?.rows[0], ...attributedetails, ...product_name},
       });
       await client.query("COMMIT");
     })
@@ -133,27 +146,39 @@ const create = async (req, res) => {
 
 const getAllWarehouseStock = (req, res) => {
   getAllWarehouse()
-    .then(({ rows }) => res.status(httpStatus.OK).send(rows))
-    .catch(() =>
+    .then(({ rows }) => {  
+      console.log("getAllWarehouseStock:", rows);
+      return res.status(httpStatus.OK).send(rows);
+    })
+    .catch((e) => {
+      console.log(e);
+
       res
         .status(httpStatus.INTERNAL_SERVER_ERROR)
-        .send({ error: "An error occurred." })
-    );
+        .send({ error: "An error occurred." });
+    });
 };
 
 const getAllProductStocks = (req, res) => {
   getProductStocks()
-    .then(({ rows }) => res.status(httpStatus.OK).send(rows))
-    .catch(() =>
+    .then(({ rows }) => {
+      console.log("rows", rows);
+      return res.status(httpStatus.OK).send(rows);
+    })
+    .catch((e) => {
+      console.log(e);
       res
         .status(httpStatus.INTERNAL_SERVER_ERROR)
-        .send({ error: "An error occurred." })
-    );
+        .send({ error: "An error occurred." });
+    });
 };
 
-const getLogsByDate = async (req, res) => {
+
+const getLogsByDate = async ( req, res) => {
   await getRangeLogs({ ...req.query })
-    .then(({ rows }) => res.status(httpStatus.OK).send(rows))
+    .then(({ rows }) => {
+      return res.status(httpStatus.OK).send(rows);
+    })
     .catch((err) => {
       console.log(err);
       return res
@@ -202,5 +227,5 @@ module.exports = {
   getAllWarehouseStock,
   put,
   remove,
-  getAllProductStocks
+  getAllProductStocks,
 };
