@@ -45,11 +45,6 @@ const create = async (req, res) => {
 
   data["currency_id"] = currency_id;
 
-  const { rows: attr } = await getAllAttributeDetails(
-    stockLogs[0].id,
-    client
-  );
-
 
   insertLog(data, client)
     .then(async ({ rows: stockLogs }) => {

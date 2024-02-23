@@ -79,20 +79,20 @@ const create = async (req, res) => {
       ...req.body,
       status: // type string
         usertype === "admin"
-          ? "11"
+          ? "111"
           : usertype === "boss"
-          ? "22"
+          ? "222"
           : usertype === "stock_manager"
-          ? "33"
+          ? "333"
           : usertype === "production_manager"
-          ? "44"
+          ? "444"
           : usertype === "domestic_market_manager"
-          ? "55"
+          ? "555"
           : usertype === "domestic_market_marketing"
-          ? "66"
+          ? "666"
           : usertype === "foreign_market_manager"
-          ? "77"
-          : usertype === "foreign_market_marketing" ?? "88",
+          ? "777"
+          : usertype === "foreign_market_marketing" ?? "888",
       approver_id:
         usertype === "admin" ||
         usertype === "stock_manager" ||

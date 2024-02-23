@@ -4,12 +4,15 @@ const insertLog = (data, client) => {
             date, userid, product_id, attributes, price, 
             quantity, waybill, payment_type, payment_date, 
             customer_id, customer_city, customer_county, 
-            currency_id, exchange_rate, details
+            currency_id, exchange_rate, vat_rate,
+            vat_witholding_rate, vat_declaration,
+            vat_witholding, price_with_vat, details
         ) 
         VALUES (
             $1, $2, $3, $4, $5,
             $6, $7, $8, $9, $10, 
-            $11, $12, $13, $14, $15
+            $11, $12, $13, $14, $15,
+            $16, $17, $18, $19, $20
         ) 
         RETURNING *`;
 
@@ -28,6 +31,11 @@ const insertLog = (data, client) => {
     data.customer_county,
     data.currency_id,
     data.exchange_rate,
+    data.vat_rate,
+    data.vat_witholding_rate,
+    data.vat_declaration,
+    data.vat_witholding,
+    data.price_with_vat,
     data.details,
   ];
 
@@ -121,7 +129,6 @@ const getWarehouseStock = (data, client) => {
   return process.pool.query(query, values);
 };
 
-
 // const getProductStocks = ()=>{
 //   return process.pool.query(
 //     `SELECT * FROM lastproductstocks ORDER BY id ASC`
@@ -148,7 +155,6 @@ const getProductStocks = () => {
       s.id ASC`
   );
 };
-
 
 const getLast = (attributes, client) => {
   const query = `
@@ -215,7 +221,6 @@ const getAllAttributeDetails = (id, client) => {
   return process.pool.query(query, values);
 };
 
-
 const getAttributeDetails = (attributesJson, client) => {
   const query = `
     SELECT 
@@ -237,7 +242,7 @@ const getAttributeDetails = (attributesJson, client) => {
         reject(err);
       } else {
         const attributeDetails = {};
-        result.rows.forEach(row => {
+        result.rows.forEach((row) => {
           attributeDetails[row.attribute_name] = row.value;
         });
         resolve(attributeDetails);
@@ -245,8 +250,6 @@ const getAttributeDetails = (attributesJson, client) => {
     });
   });
 };
-
-
 
 const getRangeLogs = async (data) => {
   return await process.pool.query(
@@ -319,8 +322,6 @@ const getAllWarehouse = () => {
       w.id ASC`
   );
 };
-
-
 
 const update = (data, client) => {
   const query =
@@ -417,5 +418,5 @@ module.exports = {
   getAllWarehouse,
   getAllAttributeDetails,
   getAttributeDetails,
-  getProductStocks
+  getProductStocks,
 };

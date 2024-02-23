@@ -42,18 +42,21 @@ const updateEach = async (id, data) => {
 
 const insertLog = (data, client) => {
   const query = `
-      INSERT INTO rawmateriallogs (
-          date, userid, product_id, attributes, price, 
-          quantity, waybill, payment_type, payment_date, 
-          customer_id, customer_city, customer_county, 
-          currency_id, exchange_rate, details
-      ) 
-      VALUES (
-          $1, $2, $3, $4, $5,
-          $6, $7, $8, $9, $10, 
-          $11, $12, $13, $14, $15
-      ) 
-      RETURNING *`;
+        INSERT INTO rawmateriallogs (
+            date, userid, product_id, attributes, price, 
+            quantity, waybill, payment_type, payment_date, 
+            customer_id, customer_city, customer_county, 
+            currency_id, exchange_rate, vat_rate,
+            vat_witholding_rate, vat_declaration,
+            vat_witholding, price_with_vat, details
+        ) 
+        VALUES (
+            $1, $2, $3, $4, $5,
+            $6, $7, $8, $9, $10, 
+            $11, $12, $13, $14, $15,
+            $16, $17, $18, $19, $20
+        ) 
+        RETURNING *`;
 
   const values = [
     data.date,
@@ -70,12 +73,18 @@ const insertLog = (data, client) => {
     data.customer_county,
     data.currency_id,
     data.exchange_rate,
+    data.vat_rate,
+    data.vat_witholding_rate,
+    data.vat_declaration,
+    data.vat_witholding,
+    data.price_with_vat,
     data.details,
   ];
 
   if (client) return client.query(query, values);
   return process.pool.query(query, values);
 };
+
 
 const getAllLogs = () => {
   return process.pool.query("SELECT * FROM rawmateriallogs ORDER BY date ASC");
