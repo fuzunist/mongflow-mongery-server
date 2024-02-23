@@ -89,41 +89,20 @@ const updateWarehouseStock = (data, client) => {
 
 const getWarehouseStock = (data, client) => {
   const query = `
-    SELECT 
-      w.id,
-      w.product_id,
-      w.price,
-      w.quantity,
-      jsonb_object_agg(attr.attribute_name, val.value) as attributeDetails
-    FROM 
-      lastproductwarehouse w
-    LEFT JOIN LATERAL (
-      SELECT key::int AS attr_id, value::int AS val_id
-      FROM jsonb_each_text(w.attributes::jsonb)
-    ) AS attr_val ON true
-    LEFT JOIN attribute AS attr ON attr.attribute_id = attr_val.attr_id
-    LEFT JOIN value AS val ON val.value_id = attr_val.val_id
+    SELECT * from lastproductwarehouse
     WHERE 
-      w.product_id = $1 
-      AND w.attributes = $2 
-      AND w.price = $3 
-      AND w.customer_id = $4 
-      AND w.customer_city = $5
-      AND w.customer_county = $6 
-      AND w.currency_id = $7 
-      AND w.exchange_rate = $8
-    GROUP BY 
-      w.id, w.product_id, w.price, w.quantity
+      product_id = $1 
+      AND attributes = $2 
+      AND customer_id = $3 
+      AND customer_city = $4
+      AND customer_county = $5
   `;
   const values = [
     data.product_id,
     data.attributes,
-    data.price,
     data.customer_id,
     data.customer_city,
     data.customer_county,
-    data.currency_id,
-    data.exchange_rate,
   ];
   if (client) return client.query(query, values);
   return process.pool.query(query, values);
@@ -366,10 +345,100 @@ const del = (id) => {
   return process.pool.query("DELETE FROM stocks WHERE stock_id = $1", [id]);
 };
 
+const delLog = (id, client) => {
+  const query = `DELETE FROM lastproductlogs WHERE id = $1`;
+  const values = [id];
+
+  if (client) return client.query(query, values);
+  return process.pool.query(query, values);
+};
+
+const delStock = (id, client) => {
+  const query = `DELETE FROM lastproductstocks WHERE id = $1`;
+  const values = [id];
+
+  if (client) return client.query(query, values);
+  return process.pool.query(query, values);
+};
+
+const delWarehouse = (id, client) => {
+  const query = `DELETE FROM lastproductwarehouse WHERE id = $1`;
+  const values = [id];
+
+  if (client) return client.query(query, values);
+  return process.pool.query(query, values);
+};
+
 const getStock = (data, client) => {
   const query =
-    "SELECT id FROM lastproductstocks WHERE product_id = $1 and attributes=$2";
+    "SELECT * FROM lastproductstocks WHERE product_id = $1 and attributes=$2";
   const values = [data.product_id, data.attributes];
+
+  if (client) return client.query(query, values);
+  return process.pool.query(query, values);
+};
+
+const getLog = (id, client) => {
+  const query =
+    "SELECT product_id, attributes, price, quantity, customer_id, customer_city, customer_county FROM lastproductlogs WHERE id = $1";
+  const values = [id];
+
+  if (client) return client.query(query, values);
+  return process.pool.query(query, values);
+};
+
+const undoStockUpdate = (data, client) => {
+  const query = `
+  UPDATE lastproductstocks 
+  SET 
+      price = CASE 
+                  WHEN (quantity - $4::numeric) <= 0 THEN 0 
+                  ELSE ROUND(((price * quantity - $4::numeric * $3::numeric) / (quantity - $4::numeric))::numeric, 4) 
+              END,
+      quantity = CASE 
+                    WHEN (quantity - $4::numeric) <= 0 THEN 0 
+                    ELSE quantity - $4::numeric 
+                END
+  WHERE 
+      product_id = $1 AND 
+      attributes = $2 
+  RETURNING *`;
+
+  const values = [data.product_id, data.attributes, data.price, data.quantity];
+
+  if (client) return client.query(query, values);
+  return process.pool.query(query, values);
+};
+
+const undoWarehouseStockUpdate = (data, client) => {
+  const query = `
+   UPDATE lastproductwarehouse
+   SET 
+       price = CASE 
+                   WHEN (quantity - $6::numeric) <= 0 THEN 0 
+                   ELSE ROUND(((price * quantity - $6::numeric * $5::numeric) / (quantity - $6::numeric))::numeric, 4) 
+               END,
+       quantity = CASE 
+                     WHEN (quantity - $6::numeric) <= 0 THEN 0 
+                     ELSE quantity - $6::numeric 
+                 END
+   WHERE 
+       product_id = $1 AND 
+       attributes = $2 AND
+       customer_id = $3 AND
+       customer_city = $4 AND
+       customer_county = $7
+   RETURNING *`;
+
+  const values = [
+    data.product_id,
+    data.attributes,
+    data.customer_id,
+    data.customer_city,
+    data.price,
+    data.quantity,
+    data.customer_county,
+  ];
 
   if (client) return client.query(query, values);
   return process.pool.query(query, values);
@@ -407,12 +476,18 @@ module.exports = {
   updateWarehouseStock,
   getWarehouseStock,
   getStock,
+  getLog,
   insertStock,
   updateStock,
   getRangeLogs,
   update,
   updateSet,
   del,
+  delLog,
+  delStock,
+  delWarehouse,
+  undoStockUpdate,
+  undoWarehouseStockUpdate,
   getLast,
   getLastSet,
   getAllWarehouse,

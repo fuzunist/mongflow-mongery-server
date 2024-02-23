@@ -198,7 +198,7 @@ const getOne = (client, product_id) => {
     )
 }
 
-const getName = (product_id, client ) => {
+const getName = (product_id, client) => {
     const query = 'SELECT product_name FROM product WHERE product_id = $1'
     if (client) return client.query(query, [product_id])
     return process.pool.query(query, [product_id])
